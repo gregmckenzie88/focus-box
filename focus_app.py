@@ -1,29 +1,81 @@
 import os
 import json
-import math
+import random
 import numpy as np
 from datetime import datetime
 from pydub import AudioSegment
 from pydub.generators import Sine
+from pydub.effects import low_pass_filter
 from gtts import gTTS
 
-def generate_binaural_beat(duration_ms=60000, base_freq=220, beat_freq=40):
+def generate_deep_layered_brown_noise(duration_ms=60000, sample_rate=44100, layer_count=3):
     """
-    Generate a stereo audio segment containing a binaural beat.
+    Generate a deeper, layered brown noise by:
+      1) Generating multiple layers of brown noise
+      2) Overlaying them
+      3) Applying a low-pass filter
     
     :param duration_ms: Duration of the audio in milliseconds
-    :param base_freq: Base frequency for the left channel
-    :param beat_freq: Frequency difference for the right channel
-    :return: pydub.AudioSegment (stereo)
+    :param sample_rate: Sample rate in Hz (44100 is typical CD-quality)
+    :param layer_count: Number of brown noise layers to overlay
+    :return: pydub.AudioSegment (stereo) with a low-pass filter applied
     """
-    left_freq = base_freq
-    right_freq = base_freq - beat_freq
     
-    left = Sine(left_freq).to_audio_segment(duration=duration_ms).apply_gain(-10.0)
-    right = Sine(right_freq).to_audio_segment(duration=duration_ms).apply_gain(-10.0)
+    def single_brown_noise(duration_ms, sample_rate):
+        """
+        Generate a single layer of brown noise approximated by
+        cumulatively integrating white noise. Returns a stereo segment.
+        """
+        num_samples = int(sample_rate * (duration_ms / 1000.0))
+        
+        # Brown noise array
+        brown_signal = np.zeros(num_samples, dtype=np.float64)
+        last_out = 0.0
+        
+        # Generate brown noise by integrating white noise
+        for i in range(num_samples):
+            white = random.uniform(-1.0, 1.0)
+            brown_signal[i] = (last_out + (0.02 * white)) / 1.02
+            last_out = brown_signal[i]
+            # Optional deeper emphasis:
+            brown_signal[i] *= 3.5
+        
+        # Convert from -1..1 to int16
+        brown_int16 = np.int16(brown_signal * 32767)
+        
+        # Create a mono pydub AudioSegment
+        brown_audio_mono = AudioSegment(
+            data=brown_int16.tobytes(),
+            sample_width=2,  # 16 bits
+            frame_rate=sample_rate,
+            channels=1
+        )
+        
+        # Convert to stereo by duplicating the mono channel
+        brown_audio_stereo = AudioSegment.from_mono_audiosegments(
+            brown_audio_mono, brown_audio_mono
+        )
+        
+        # Reduce overall volume to avoid clipping when layers are stacked
+        brown_audio_stereo = brown_audio_stereo.apply_gain(-10.0)
+        return brown_audio_stereo
+
+    # Generate and overlay multiple layers
+    layered_noise = None
+    for _ in range(layer_count):
+        layer = single_brown_noise(duration_ms, sample_rate)
+        if layered_noise is None:
+            layered_noise = layer
+        else:
+            # Overlay the new layer on top of the existing
+            layered_noise = layered_noise.overlay(layer)
     
-    stereo_segment = AudioSegment.from_mono_audiosegments(left, right)
-    return stereo_segment
+    # Apply a low-pass filter to deepen the tone
+    # Lower cutoff => more bass emphasis
+    # Try values between 200-800 Hz; adjust to taste
+    deep_brown_noise = low_pass_filter(layered_noise, cutoff=500)
+    
+    return deep_brown_noise
 
 def text_to_speech(text, lang="en", slow=False):
     """
@@ -54,6 +106,9 @@ def generate_soft_tone(duration_ms=1000, freq=440):
 def create_silence(duration_ms=5000):
     """
     Create silence for the given duration using pydub.
+    
+    :param duration_ms: Duration in milliseconds
+    :return: pydub.AudioSegment
     """
     return AudioSegment.silent(duration=duration_ms)
 
@@ -65,8 +120,8 @@ def main():
     # Start building the final audio track
     final_audio = AudioSegment.silent(duration=0)
     
-    # Generate a 1-minute binaural beat chunk for reuse
-    one_minute_binaural = generate_binaural_beat(duration_ms=60000)
+    # Generate 1 minute of deeper, layered brown noise
+    one_minute_brown = generate_deep_layered_brown_noise(duration_ms=60000)
     
     for i, task in enumerate(tasks):
         task_name = task["name"]
@@ -76,18 +131,16 @@ def main():
         introduction_text = f"{task_name} - {task_duration_minutes} minutes"
         tts_intro = text_to_speech(introduction_text)
         
-        # Overlay TTS on a slice of the binaural track
-        buffer_binaural = one_minute_binaural[:tts_intro.duration_seconds * 1000]
-        segment_introduction = buffer_binaural.overlay(tts_intro)
+        # Overlay TTS on a slice of the brown noise
+        buffer_brown = one_minute_brown[: int(tts_intro.duration_seconds * 1000)]
+        segment_introduction = buffer_brown.overlay(tts_intro)
         final_audio += segment_introduction
         
         # 2) Handle each minute of the task
         for minute in range(task_duration_minutes):
-            # Copy 1-minute binaural
-            minute_segment = one_minute_binaural
+            minute_segment = one_minute_brown
             
-            # Create the reminder overlay
-            # "Meditation, 3 minutes left" if 3 minutes remain in the current task
+            # "Meditation, 3 minutes left"
             minutes_left = task_duration_minutes - minute
             reminder_text = f"{task_name}, {minutes_left} minutes left"
             tts_reminder = text_to_speech(reminder_text)
@@ -97,8 +150,7 @@ def main():
             
             final_audio += minute_segment
             
-            # One minute before next task => "coming up next: XYZ - N minutes"
-            # if there's a next task
+            # One minute before next task => "coming up next, XYZ - N minutes."
             if (minute == task_duration_minutes - 2) and (i < len(tasks) - 1):
                 next_task_name = tasks[i + 1]["name"]
                 next_task_duration = tasks[i + 1]["duration_minutes"]
