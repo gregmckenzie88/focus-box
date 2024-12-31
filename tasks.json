@@ -1,0 +1,6 @@
+[
+  { "name": "Forearm exercise", "duration_minutes": 10 },
+  { "name": "Run", "duration_minutes": 10 },
+  { "name": "Meditation", "duration_minutes": 10 },
+  { "name": "Revise script to countdown minutes", "duration_minutes": 10 }
+]
