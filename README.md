@@ -27,3 +27,6 @@ This project generates an audio track designed to help keep you on task. It uses
    git clone https://github.com/your-repo/focus_vibe_prompt.git
    cd focus_vibe_prompt
    ```
+
+docker build -t focus_vibe_image .
+docker run -v $(pwd):/app focus_vibe_image
