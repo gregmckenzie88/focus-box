@@ -29,7 +29,7 @@ def generate_deep_layered_brown_noise(duration_ms=60000, sample_rate=44100, laye
             white = random.uniform(-1.0, 1.0)
             brown_signal[i] = (last_out + (0.02 * white)) / 1.02
             last_out = brown_signal[i]
-            # Optional deeper emphasis:
+            # Emphasize deeper frequencies
             brown_signal[i] *= 3.5
         
         brown_int16 = np.int16(brown_signal * 32767)
@@ -74,12 +74,37 @@ def text_to_speech(text, lang="en", slow=False):
     os.remove("temp_tts.mp3")
     return spoken_audio
 
-def generate_soft_tone(duration_ms=1000, freq=440):
+def generate_celebratory_sequence():
     """
-    Generate a soft tone of a given frequency and duration.
+    Generate a short celebratory *sequence* of notes (C, E, G, C up an octave).
+    The last note is sustained twice as long to let it ring out.
     """
-    tone = Sine(freq).to_audio_segment(duration=duration_ms).apply_gain(-15.0)
-    return tone
+    # Frequencies for a short uplifting sequence in C major: [C5, E5, G5, C6]
+    note_frequencies = [523, 659, 783, 1046]  
+    base_note_duration_ms = 400  # each note is 0.4s except the last one
+    
+    sequence = AudioSegment.silent(duration=0)
+    
+    for i, freq in enumerate(note_frequencies):
+        # If it's the last note in the list, sustain it twice as long
+        if i == len(note_frequencies) - 1:
+            note_duration = base_note_duration_ms * 2
+        else:
+            note_duration = base_note_duration_ms
+        
+        note = Sine(freq).to_audio_segment(duration=note_duration)
+        
+        # Slight fade-in/out to remove clicks
+        # Increase the fade-out for the last note to let it ring out gracefully
+        if i == len(note_frequencies) - 1:
+            note = note.apply_gain(-5.0).fade_in(50).fade_out(300)
+        else:
+            note = note.apply_gain(-5.0).fade_in(50).fade_out(50)
+        
+        # Append to the sequence
+        sequence += note
+    
+    return sequence
 
 def create_silence(duration_ms=5000):
     """
@@ -113,7 +138,6 @@ def main():
         
         # 2) Handle each minute of the task
         for minute in range(task_duration_minutes):
-            # Copy the 1-minute brown noise segment
             minute_segment = one_minute_brown
             
             # "TaskName, X minutes left"
@@ -126,22 +150,18 @@ def main():
             
             # If this is the final minute, overlay a last 10-second countdown
             if minute == task_duration_minutes - 1:
-                # Create the countdown for "ten" down to "one"
                 countdown_words = [
                     "ten", "nine", "eight", "seven", "six",
                     "five", "four", "three", "two", "one"
                 ]
-                # Each word goes from second 50 to 59
                 for idx, word in enumerate(countdown_words):
-                    position_ms = 50000 + (idx * 1000)  # 50s, 51s, ..., 59s
+                    position_ms = 50000 + (idx * 1000)  # 50s to 59s
                     tts_countdown = text_to_speech(word)
                     minute_segment = minute_segment.overlay(tts_countdown, position=position_ms)
             
-            # Append this finished minute to final_audio
             final_audio += minute_segment
             
             # One minute before next task => "coming up next, XYZ - N minutes"
-            # if there is a next task
             if (minute == task_duration_minutes - 2) and (i < len(tasks) - 1):
                 next_task_name = tasks[i + 1]["name"]
                 next_task_duration = tasks[i + 1]["duration_minutes"]
@@ -152,9 +172,9 @@ def main():
                     position=(len(final_audio) - tts_coming_up.duration_seconds * 1000)
                 )
         
-        # 3) End of task: soft tone + 5 seconds silence
-        soft_tone = generate_soft_tone(duration_ms=1000, freq=440)
-        final_audio += soft_tone
+        # 3) End of task: celebratory *sequence* + 5 seconds silence
+        celebration_sequence = generate_celebratory_sequence()
+        final_audio += celebration_sequence
         final_audio += create_silence(duration_ms=5000)
     
     # 4) Export the final audio with timestamped filename
