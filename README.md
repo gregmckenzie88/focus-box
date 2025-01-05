@@ -6,6 +6,12 @@ This project generates an audio track designed to help keep you on task. It uses
 - **Voice prompts** for introducing tasks, minute-by-minute reminders, and upcoming tasks.
 - **Break tone** at the end of each task.
 
+## Problem Statement
+
+While working on a computer, especially in a busy environment, it is very easy to become distracted or succumb to the impulse to multitask. This can get in the way of true productivity and can have a negative impact on the quality of your work.
+
+By having the user declare a list of tasks they would like to focus on, set a time limit on it, provide the user with relaxing "brown noise" in the background, as well as a reminder every minute of what it is they should be focusing on, they can increase their productivity and work with an increased level of focus.
+
 ## Contents
 
 1. [Requirements](#requirements)
