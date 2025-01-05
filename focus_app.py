@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import random
 import numpy as np
@@ -8,6 +9,14 @@ from pydub.generators import Sine
 from pydub.effects import low_pass_filter
 from gtts import gTTS
 
+# NEW: import the spellchecker library
+try:
+    from spellchecker import SpellChecker
+    spell = SpellChecker()
+except ImportError:
+    spell = None
+    print("Warning: 'pyspellchecker' not found. Misspelled words will not be corrected.")
+
 def generate_deep_layered_brown_noise(duration_ms=60000, sample_rate=44100, layer_count=3):
     """
     Generate a deeper, layered brown noise by:
@@ -16,12 +25,7 @@ def generate_deep_layered_brown_noise(duration_ms=60000, sample_rate=44100, laye
       3) Applying a low-pass filter
     """
     def single_brown_noise(duration_ms, sample_rate):
-        """
-        Generate one layer of brown noise approximated by
-        cumulatively integrating white noise. Returns a stereo segment.
-        """
         num_samples = int(sample_rate * (duration_ms / 1000.0))
-        
         brown_signal = np.zeros(num_samples, dtype=np.float64)
         last_out = 0.0
         
@@ -29,12 +33,10 @@ def generate_deep_layered_brown_noise(duration_ms=60000, sample_rate=44100, laye
             white = random.uniform(-1.0, 1.0)
             brown_signal[i] = (last_out + (0.02 * white)) / 1.02
             last_out = brown_signal[i]
-            # Emphasize deeper frequencies
             brown_signal[i] *= 3.5
         
         brown_int16 = np.int16(brown_signal * 32767)
         
-        # Create a mono pydub AudioSegment
         brown_audio_mono = AudioSegment(
             data=brown_int16.tobytes(),
             sample_width=2,  # 16 bits
@@ -42,16 +44,13 @@ def generate_deep_layered_brown_noise(duration_ms=60000, sample_rate=44100, laye
             channels=1
         )
         
-        # Convert to stereo by duplicating the mono channel
         brown_audio_stereo = AudioSegment.from_mono_audiosegments(
             brown_audio_mono, brown_audio_mono
         )
         
-        # Reduce volume to avoid clipping when layers are stacked
         brown_audio_stereo = brown_audio_stereo.apply_gain(-10.0)
         return brown_audio_stereo
 
-    # Overlay multiple brown noise layers
     layered_noise = None
     for _ in range(layer_count):
         layer = single_brown_noise(duration_ms, sample_rate)
@@ -60,15 +59,47 @@ def generate_deep_layered_brown_noise(duration_ms=60000, sample_rate=44100, laye
         else:
             layered_noise = layered_noise.overlay(layer)
     
-    # Apply a low-pass filter to deepen the tone
     deep_brown_noise = low_pass_filter(layered_noise, cutoff=500)
     return deep_brown_noise
 
 def text_to_speech(text, lang="en", slow=False):
     """
     Convert text to speech using gTTS.
+    Steps:
+      1) Replace non-alphanumeric chars with spaces
+      2) Collapse extra spaces
+      3) Spell-check each word (if pyspellchecker is installed)
+      4) Send to gTTS
     """
-    tts = gTTS(text=text, lang=lang, slow=slow, tld="com")
+    # Step 1 & 2: Sanitize text
+    safe_text = re.sub(r'[^a-zA-Z0-9\s]', ' ', text)  # Replace non-alphanumeric with space
+    safe_text = re.sub(r'\s+', ' ', safe_text).strip() # Collapse spaces, trim ends
+    
+    # Step 3: Spell-check if spellchecker is available
+    # (Handle uppercase carefully by lowercasing for correction, then preserving case if needed.)
+    if spell is not None:
+        words = safe_text.split()
+        corrected_words = []
+        for w in words:
+            # We'll do a lower-case check, then preserve original case for first letter
+            # if the word is capitalized. This is a naive approach but works fairly well.
+            is_capitalized = (len(w) > 0 and w[0].isupper())
+            lower_w = w.lower()
+            
+            corrected_w = spell.correction(lower_w)
+            if corrected_w is None:
+                corrected_w = lower_w
+            
+            # Reapply capitalization if needed
+            if is_capitalized:
+                corrected_w = corrected_w.capitalize()
+            
+            corrected_words.append(corrected_w)
+        
+        safe_text = " ".join(corrected_words)
+    
+    # Step 4: Pass safe_text to gTTS
+    tts = gTTS(text=safe_text, lang=lang, slow=slow, tld="com")
     tts.save("temp_tts.mp3")
     spoken_audio = AudioSegment.from_file("temp_tts.mp3", format="mp3")
     os.remove("temp_tts.mp3")
@@ -79,14 +110,12 @@ def generate_celebratory_sequence():
     Generate a short celebratory *sequence* of notes (C, E, G, C up an octave).
     The last note is sustained twice as long to let it ring out.
     """
-    # Frequencies for a short uplifting sequence in C major: [C5, E5, G5, C6]
-    note_frequencies = [523, 659, 783, 1046]  
-    base_note_duration_ms = 400  # each note is 0.4s except the last one
+    note_frequencies = [523, 659, 783, 1046]  # C5, E5, G5, C6
+    base_note_duration_ms = 400
     
     sequence = AudioSegment.silent(duration=0)
     
     for i, freq in enumerate(note_frequencies):
-        # If it's the last note in the list, sustain it twice as long
         if i == len(note_frequencies) - 1:
             note_duration = base_note_duration_ms * 2
         else:
@@ -94,22 +123,16 @@ def generate_celebratory_sequence():
         
         note = Sine(freq).to_audio_segment(duration=note_duration)
         
-        # Slight fade-in/out to remove clicks
-        # Increase the fade-out for the last note to let it ring out gracefully
         if i == len(note_frequencies) - 1:
             note = note.apply_gain(-5.0).fade_in(50).fade_out(300)
         else:
             note = note.apply_gain(-5.0).fade_in(50).fade_out(50)
         
-        # Append to the sequence
         sequence += note
     
     return sequence
 
 def create_silence(duration_ms=5000):
-    """
-    Create silence for the given duration.
-    """
     return AudioSegment.silent(duration=duration_ms)
 
 def main():
@@ -117,45 +140,38 @@ def main():
     with open("tasks.json", "r") as f:
         tasks = json.load(f)
 
-    # Start building the final audio track
     final_audio = AudioSegment.silent(duration=0)
     
-    # Generate 1 minute of deeper, layered brown noise
     one_minute_brown = generate_deep_layered_brown_noise(duration_ms=60000)
     
     for i, task in enumerate(tasks):
         task_name = task["name"]
         task_duration_minutes = task["duration_minutes"]
         
-        # 1) Introduce the task
         introduction_text = f"{task_name} - {task_duration_minutes} minutes"
         tts_intro = text_to_speech(introduction_text)
         
-        # Overlay TTS on a slice of the brown noise
         buffer_brown = one_minute_brown[: int(tts_intro.duration_seconds * 1000)]
         segment_introduction = buffer_brown.overlay(tts_intro)
         final_audio += segment_introduction
         
-        # 2) Handle each minute of the task
         for minute in range(task_duration_minutes):
             minute_segment = one_minute_brown
             
-            # "TaskName, X minutes left"
             minutes_left = task_duration_minutes - minute
             reminder_text = f"{task_name}, {minutes_left} minutes left"
             tts_reminder = text_to_speech(reminder_text)
             
-            # Overlay the reminder at 3 seconds
             minute_segment = minute_segment.overlay(tts_reminder, position=3000)
             
-            # If this is the final minute, overlay a last 10-second countdown
+            # Final minute countdown
             if minute == task_duration_minutes - 1:
                 countdown_words = [
                     "ten", "nine", "eight", "seven", "six",
                     "five", "four", "three", "two", "one"
                 ]
                 for idx, word in enumerate(countdown_words):
-                    position_ms = 50000 + (idx * 1000)  # 50s to 59s
+                    position_ms = 50000 + (idx * 1000)
                     tts_countdown = text_to_speech(word)
                     minute_segment = minute_segment.overlay(tts_countdown, position=position_ms)
             
@@ -172,12 +188,11 @@ def main():
                     position=(len(final_audio) - tts_coming_up.duration_seconds * 1000)
                 )
         
-        # 3) End of task: celebratory *sequence* + 5 seconds silence
+        # End of task
         celebration_sequence = generate_celebratory_sequence()
         final_audio += celebration_sequence
         final_audio += create_silence(duration_ms=5000)
     
-    # 4) Export the final audio with timestamped filename
     now = datetime.now()
     timestamp = now.strftime("%Y%m%d_%H_%M_%S")
     output_filename = f"focus_box_{timestamp}.mp3"

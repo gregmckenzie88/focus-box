@@ -1,8 +1,4 @@
 [
-  { "name": "Write to Casey, do you want a white noise track", "duration_minutes": 2 },
-  { "name": "Book Imanishi reservation", "duration_minutes": 4 },
-  { "name": "Reply to art store guy", "duration_minutes": 5 },
-  { "name": "Include countdown on Focus Box task", "duration_minutes": 6 },
-  { "name": "Include celebratory chime on Focus Box task", "duration_minutes": 6 },
-  { "name": "No verify on create tag push, pull request only", "duration_minutes": 10 }
+  { "name": "Handle for special charcters in Focus Box *", "duration_minutes": 3 },
+  { "name": "Book Imanishi reservation", "duration_minutes": 4 }
 ]
