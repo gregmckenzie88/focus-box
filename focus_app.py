@@ -194,11 +194,19 @@ def main():
         final_audio += celebration_sequence
         final_audio += create_silence(duration_ms=5000)
     
+    # Use Toronto time zone
     toronto_tz = pytz.timezone("America/Toronto")
     now_toronto = datetime.now(toronto_tz)
     timestamp = now_toronto.strftime("%Y%m%d_%H_%M_%S")
-    output_filename = f"focus_box_{timestamp}.mp3"
 
+    # Ensure the 'dist' directory exists
+    output_folder = "focus_box_dist"
+    os.makedirs(output_folder, exist_ok=True)
+
+    # Construct the filename inside 'dist'
+    output_filename = os.path.join(output_folder, f"focus_box_{timestamp}.mp3")
+
+    # Export the audio file
     final_audio.export(output_filename, format="mp3")
     print(f"Successfully generated {output_filename}")
 
