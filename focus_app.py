@@ -77,13 +77,10 @@ def text_to_speech(text, lang="en", slow=False):
     safe_text = re.sub(r'\s+', ' ', safe_text).strip() # Collapse spaces, trim ends
     
     # Step 3: Spell-check if spellchecker is available
-    # (Handle uppercase carefully by lowercasing for correction, then preserving case if needed.)
     if spell is not None:
         words = safe_text.split()
         corrected_words = []
         for w in words:
-            # We'll do a lower-case check, then preserve original case for first letter
-            # if the word is capitalized. This is a naive approach but works fairly well.
             is_capitalized = (len(w) > 0 and w[0].isupper())
             lower_w = w.lower()
             
@@ -91,7 +88,6 @@ def text_to_speech(text, lang="en", slow=False):
             if corrected_w is None:
                 corrected_w = lower_w
             
-            # Reapply capitalization if needed
             if is_capitalized:
                 corrected_w = corrected_w.capitalize()
             
@@ -159,11 +155,13 @@ def main():
         for minute in range(task_duration_minutes):
             minute_segment = one_minute_brown
             
-            minutes_left = task_duration_minutes - minute
-            reminder_text = f"{task_name}, {minutes_left} minutes left"
-            tts_reminder = text_to_speech(reminder_text)
-            
-            minute_segment = minute_segment.overlay(tts_reminder, position=3000)
+            # We only speak the reminder every 2 minutes (and skip minute 0 & final minute)
+            # The final minute does the 10-second countdown, so skip the normal reminder there as well.
+            if (minute != 0) and (minute != task_duration_minutes - 1) and (minute % 2 == 0):
+                minutes_left = task_duration_minutes - minute
+                reminder_text = f"{task_name}, {minutes_left} minutes left"
+                tts_reminder = text_to_speech(reminder_text)
+                minute_segment = minute_segment.overlay(tts_reminder, position=3000)
             
             # Final minute countdown
             if minute == task_duration_minutes - 1:
