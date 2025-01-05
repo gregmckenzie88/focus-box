@@ -8,6 +8,7 @@ from pydub import AudioSegment
 from pydub.generators import Sine
 from pydub.effects import low_pass_filter
 from gtts import gTTS
+import pytz
 
 # NEW: import the spellchecker library
 try:
@@ -193,9 +194,11 @@ def main():
         final_audio += celebration_sequence
         final_audio += create_silence(duration_ms=5000)
     
-    now = datetime.now()
-    timestamp = now.strftime("%Y%m%d_%H_%M_%S")
+    toronto_tz = pytz.timezone("America/Toronto")
+    now_toronto = datetime.now(toronto_tz)
+    timestamp = now_toronto.strftime("%Y%m%d_%H_%M_%S")
     output_filename = f"focus_box_{timestamp}.mp3"
+
     final_audio.export(output_filename, format="mp3")
     print(f"Successfully generated {output_filename}")
 

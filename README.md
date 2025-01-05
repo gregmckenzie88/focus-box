@@ -1,4 +1,4 @@
-# Focus Vibe Prompt
+# Focus Box Prompt
 
 This project generates an audio track designed to help keep you on task. It uses:
 
@@ -24,8 +24,8 @@ This project generates an audio track designed to help keep you on task. It uses
 
 1. **Clone this repository** or download the files to your local machine:
    ```bash
-   git clone https://github.com/your-repo/focus_vibe_prompt.git
-   cd focus_vibe_prompt
+   git clone https://github.com/gregmckenzie88/focus-box
+   cd focus-box
    ```
 
 docker build -t focus_vibe_image .
