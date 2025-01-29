@@ -64,6 +64,7 @@ By having the user declare a list of tasks they would like to focus on, set a ti
    ```bash
    docker build -t focus_box_image .
    docker run -v $(pwd):/app focus_box_image
+   cp /Users/gregmckenzie/Desktop/repos/focus_box/focus_box_dist/*.mp3 /Users/gregmckenzie/Dropbox/__focus-vibe/
    ```
 
 ## Usage
