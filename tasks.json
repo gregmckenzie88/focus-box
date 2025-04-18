@@ -1,4 +1,6 @@
 [
-  { "name": "Handle for special charcters in Focus Box *", "duration_minutes": 4 },
-  { "name": "Book Imanishi reservation", "duration_minutes": 1 }
+  {"name": "Check the weather", "duration_minutes": 2},
+  {"name": "Get dressed to go for a run", "duration_minutes": 3},
+  {"name": "Run around the park", "duration_minutes": 9},
+  {"name": "Make oatmeal", "duration_minutes": 3}
 ]
